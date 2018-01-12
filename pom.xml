@@ -12,6 +12,7 @@
 
     <modules>
         <module>mysql-proxy</module>
+        <module>netty</module>
     </modules>
 
     <properties>
