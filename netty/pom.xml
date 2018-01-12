@@ -16,13 +16,11 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <version>4.1.19.Final</version>
         </dependency>
 
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-http</artifactId>
-            <version>4.1.19.Final</version>
         </dependency>
 
         <dependency> <!-- 桥接：告诉Slf4j使用Log4j2 -->
