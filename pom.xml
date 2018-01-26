@@ -11,6 +11,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>http-mapped</module>
         <module>mysql-proxy</module>
         <module>netty</module>
     </modules>
