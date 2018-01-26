@@ -6,13 +6,17 @@ import io.vertx.core.VertxOptions;
 import io.vertx.core.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 
 /**
  * Created by 581854 on 2017-11-03 15:03.
  */
 public class HttpMappedServer {
 
-    //mvn deploy:deploy-file -Durl=http://127.0.0.1:8081/artifactory/libs-release-local -DrepositoryId=central -Dfile=security-db-driver-mysql-3.0.11.master.jar -DgroupId=com.sfbest.arch.jdbc -DartifactId=security-db-driver -Dversion=3.0.11.master
+    static {
+        SLF4JBridgeHandler.removeHandlersForRootLogger();
+        SLF4JBridgeHandler.install();
+    }
 
     private static final Logger logger = LoggerFactory.getLogger(HttpMappedServer.class);
 
@@ -23,32 +27,19 @@ public class HttpMappedServer {
     }
 
     public static class HttpMappedServerVerticle extends AbstractVerticle {
-        private final int port = 8081;
-        private final int targetPort = 8080;
+        private final int port = 8080;
+        private final int targetPort = 8081;
         private final String targetHost = "127.0.0.1";//"10.102.32.88";
 
         @Override
-        public void start() throws Exception {
+        public void start() {
             HttpServerOptions serverOptions = new HttpServerOptions().setLogActivity(false);
             HttpServer httpServer = vertx.createHttpServer(serverOptions);
 
-            HttpClientOptions clientOptions = new HttpClientOptions().setLogActivity(true);
+            HttpClientOptions clientOptions = new HttpClientOptions().setLogActivity(false);
             HttpClient httpClient = vertx.createHttpClient(clientOptions);
 
             httpServer.requestHandler(request -> {
-
-                request.connection().closeHandler(handler -> {
-                    request.connection().close();
-                });
-
-                request.connection().exceptionHandler(e -> {
-                    logger.debug("Client closed ......");
-                    request.connection().close();
-                });
-
-                if ("PUT".equals(request.method().name())) {
-                    logger.debug("Request URI: " + request.uri());
-                }
 
                 RequestOptions requestOptions = new RequestOptions();
                 requestOptions.setHost(targetHost);
@@ -62,14 +53,40 @@ public class HttpMappedServer {
                 });
 
                 localRequest.headers().addAll(request.headers());
-
-                request.endHandler(handler -> {
-                    localRequest.end();
+/*
+                request.connection().closeHandler(handler -> {
+                    localRequest.connection().close();
                 });
 
-                request.bodyHandler(buffer -> {
-                    localRequest.write(buffer);
+                request.connection().exceptionHandler(e -> {
+                    request.connection().close();
                 });
+*/
+                localRequest.exceptionHandler(handler -> {
+                    localRequest.connection().close();
+                    request.connection().close();
+                });
+
+                request.endHandler(handler -> localRequest.end());
+
+                switch (request.method()) {
+                    case PUT: {
+                        //call service to check
+                    }
+                    case POST: {
+                        request.bodyHandler(localRequest::write);
+                        break;
+                    }
+                    case GET: {
+                        String path = request.uri().toLowerCase();
+                        if (path.endsWith(".zip") || path.endsWith(".war")) {
+                            // spec file can't download
+                        }
+                    }
+                    default: {
+                        // Other no request body of http method
+                    }
+                }
 
             }).listen(port, listenResult -> { //代理服务器的监听端口
                 if (listenResult.succeeded()) {
