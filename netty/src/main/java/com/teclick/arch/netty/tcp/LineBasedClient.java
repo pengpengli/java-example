@@ -10,7 +10,7 @@ import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 
 /**
- * Created by 581854 on 2018-01-08 10:19.
+ * Created by pengli on 2018-01-08.
  */
 public class LineBasedClient {
 

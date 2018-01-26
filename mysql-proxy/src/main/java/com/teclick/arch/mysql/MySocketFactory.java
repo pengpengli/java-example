@@ -8,7 +8,7 @@ import java.net.SocketException;
 import java.util.Properties;
 
 /**
- * Created by 581854 on 2017-11-06 13:56.
+ * Created by pengli on 2017-11-06.
  */
 public class MySocketFactory extends StandardSocketFactory {
 

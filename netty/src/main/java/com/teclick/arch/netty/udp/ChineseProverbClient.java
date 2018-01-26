@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.net.InetSocketAddress;
 
 /**
- * Created by 581854 on 2018-01-08 11:50.
+ * Created by pengli on 2018-01-08.
  */
 public class ChineseProverbClient {
 

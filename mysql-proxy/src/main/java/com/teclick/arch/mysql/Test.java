@@ -7,7 +7,7 @@ import java.sql.ResultSet;
 import java.util.Properties;
 
 /**
- * Created by 581854 on 2017-11-03 15:11.
+ * Created by pengli on 2017-11-03.
  */
 public class Test {
 

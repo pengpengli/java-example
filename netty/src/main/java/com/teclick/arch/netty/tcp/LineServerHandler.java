@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Created by 581854 on 2018-01-08 10:32.
+ * Created by pengli on 2018-01-08.
  */
 public class LineServerHandler extends ChannelInboundHandlerAdapter {
 

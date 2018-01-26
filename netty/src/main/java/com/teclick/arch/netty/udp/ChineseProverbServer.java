@@ -7,7 +7,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 
 /**
- * Created by 581854 on 2018-01-08 11:43.
+ * Created by pengli on 2018-01-08.
  */
 public class ChineseProverbServer {
 

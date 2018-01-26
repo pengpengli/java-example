@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
 /**
- * Created by 581854 on 2017-11-03 15:03.
+ * Created by pengli on 2017-11-03.
  */
 public class HttpMappedServer {
 
@@ -29,18 +29,17 @@ public class HttpMappedServer {
     public static class HttpMappedServerVerticle extends AbstractVerticle {
         private final int port = 8080;
         private final int targetPort = 8081;
-        private final String targetHost = "127.0.0.1";//"10.102.32.88";
+        private final String targetHost = "127.0.0.1";
 
         @Override
         public void start() {
-            HttpServerOptions serverOptions = new HttpServerOptions().setLogActivity(false);
+            HttpServerOptions serverOptions = new HttpServerOptions().setLogActivity(true);
             HttpServer httpServer = vertx.createHttpServer(serverOptions);
 
             HttpClientOptions clientOptions = new HttpClientOptions().setLogActivity(false);
             HttpClient httpClient = vertx.createHttpClient(clientOptions);
 
             httpServer.requestHandler(request -> {
-
                 RequestOptions requestOptions = new RequestOptions();
                 requestOptions.setHost(targetHost);
                 requestOptions.setPort(targetPort);
@@ -48,43 +47,49 @@ public class HttpMappedServer {
 
                 HttpClientRequest localRequest = httpClient.request(request.method(), requestOptions, response -> {
                     request.response().setStatusCode(response.statusCode());
+                    request.response().setStatusMessage(response.statusMessage());
                     request.response().headers().clear().addAll(response.headers());
-                    response.bodyHandler(bodyBuffer -> request.response().end(bodyBuffer));
+                    //request.response().putHeader(HttpHeaders.SET_COOKIE, response.getHeader(HttpHeaders.SET_COOKIE));
+                    request.response().setChunked(true);
+
+                    response.endHandler(handler -> request.response().end());
+                    response.handler(handler -> request.response().write(handler));
                 });
 
-                localRequest.headers().addAll(request.headers());
-/*
-                request.connection().closeHandler(handler -> {
-                    localRequest.connection().close();
-                });
-
-                request.connection().exceptionHandler(e -> {
+                request.exceptionHandler(handler ->{
                     request.connection().close();
+                    if (null != localRequest.connection()) {
+                        localRequest.connection().close();
+                    }
                 });
-*/
+
                 localRequest.exceptionHandler(handler -> {
-                    localRequest.connection().close();
+                    if (null != localRequest.connection()) {
+                        localRequest.connection().close();
+                    }
                     request.connection().close();
                 });
 
+                localRequest.headers().clear().addAll(request.headers());
+                //localRequest.putHeader(HttpHeaders.SET_COOKIE, request.getHeader(HttpHeaders.SET_COOKIE));
                 request.endHandler(handler -> localRequest.end());
 
                 switch (request.method()) {
-                    case PUT: {
-                        //call service to check
-                    }
-                    case POST: {
-                        request.bodyHandler(localRequest::write);
-                        break;
-                    }
                     case GET: {
-                        String path = request.uri().toLowerCase();
+                        String path = request.path().toLowerCase();
                         if (path.endsWith(".zip") || path.endsWith(".war")) {
                             // spec file can't download
                         }
                     }
+                    case DELETE: {
+                        break;
+                    }
+                    case PUT: {
+                        // Call verify service to check
+                    }
+                    case POST:
                     default: {
-                        // Other no request body of http method
+                        request.handler(localRequest::write);
                     }
                 }
 
