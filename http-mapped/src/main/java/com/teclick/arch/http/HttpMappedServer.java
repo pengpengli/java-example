@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
+import java.util.Map;
+
 /**
  * Created by pengli on 2017-11-03.
  */
@@ -23,23 +25,27 @@ public class HttpMappedServer {
     public static void main(String[] args) {
         VertxOptions options = new VertxOptions();
         options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
+        options.setFileResolverCachingEnabled(false);
         Vertx.vertx(options).deployVerticle(new HttpMappedServerVerticle());
     }
 
     public static class HttpMappedServerVerticle extends AbstractVerticle {
-        private final int port = 8080;
+
+        private final int port = 80;
         private final int targetPort = 8081;
-        private final String targetHost = "127.0.0.1";
+        private final String targetHost = "localhost";
 
         @Override
         public void start() {
-            HttpServerOptions serverOptions = new HttpServerOptions().setLogActivity(true);
+            HttpServerOptions serverOptions = new HttpServerOptions().setLogActivity(false);//.setIdleTimeout(1);
             HttpServer httpServer = vertx.createHttpServer(serverOptions);
+            httpServer.exceptionHandler(throwable -> logger.error("Server met exception", throwable));
 
-            HttpClientOptions clientOptions = new HttpClientOptions().setLogActivity(false);
+            HttpClientOptions clientOptions = new HttpClientOptions().setLogActivity(false).setKeepAlive(false);
             HttpClient httpClient = vertx.createHttpClient(clientOptions);
 
             httpServer.requestHandler(request -> {
+
                 RequestOptions requestOptions = new RequestOptions();
                 requestOptions.setHost(targetHost);
                 requestOptions.setPort(targetPort);
@@ -49,11 +55,27 @@ public class HttpMappedServer {
                     request.response().setStatusCode(response.statusCode());
                     request.response().setStatusMessage(response.statusMessage());
                     request.response().headers().clear().addAll(response.headers());
-                    //request.response().putHeader(HttpHeaders.SET_COOKIE, response.getHeader(HttpHeaders.SET_COOKIE));
                     request.response().setChunked(true);
 
                     response.endHandler(handler -> request.response().end());
                     response.handler(handler -> request.response().write(handler));
+                });
+
+                localRequest.headers().clear();
+                for (Map.Entry<String, String> entry: request.headers()) {
+                    String key = entry.getKey();
+                    if ("HOST".equalsIgnoreCase(key)) {
+                        localRequest.headers().add(key, targetHost);
+                    } else {
+                        localRequest.headers().add(key, entry.getValue());
+                    }
+                }
+
+                localRequest.exceptionHandler(handler -> {
+                    if (null != localRequest.connection()) {
+                        localRequest.connection().close();
+                    }
+                    request.connection().close();
                 });
 
                 request.exceptionHandler(handler ->{
@@ -63,15 +85,6 @@ public class HttpMappedServer {
                     }
                 });
 
-                localRequest.exceptionHandler(handler -> {
-                    if (null != localRequest.connection()) {
-                        localRequest.connection().close();
-                    }
-                    request.connection().close();
-                });
-
-                localRequest.headers().clear().addAll(request.headers());
-                //localRequest.putHeader(HttpHeaders.SET_COOKIE, request.getHeader(HttpHeaders.SET_COOKIE));
                 request.endHandler(handler -> localRequest.end());
 
                 switch (request.method()) {
@@ -81,6 +94,7 @@ public class HttpMappedServer {
                             // spec file can't download
                         }
                     }
+                    case HEAD:
                     case DELETE: {
                         break;
                     }
@@ -93,7 +107,7 @@ public class HttpMappedServer {
                     }
                 }
 
-            }).listen(port, listenResult -> { //代理服务器的监听端口
+            }).listen(port, listenResult -> {
                 if (listenResult.succeeded()) {
                     logger.info("http mapped server start up.");
                 } else {

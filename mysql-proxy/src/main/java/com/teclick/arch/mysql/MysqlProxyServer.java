@@ -8,16 +8,25 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.NetClient;
 import io.vertx.core.net.NetServer;
 import io.vertx.core.net.NetSocket;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 
 /**
  * Created by pengli on 2017-11-03.
  */
 public class MysqlProxyServer {
 
+    static {
+        SLF4JBridgeHandler.removeHandlersForRootLogger();
+        SLF4JBridgeHandler.install();
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(MysqlProxyServer.class);
 
     public static void main(String[] args) {
-        Vertx.vertx().deployVerticle(new MysqlProxyServerVerticle());
+        VertxOptions options = new VertxOptions();
+        options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
+        options.setFileResolverCachingEnabled(false);
+        Vertx.vertx(options).deployVerticle(new MysqlProxyServerVerticle());
     }
 
     public static class MysqlProxyServerVerticle extends AbstractVerticle {
@@ -28,10 +37,6 @@ public class MysqlProxyServer {
         public void start() throws Exception {
             NetServer netServer = vertx.createNetServer();//创建代理服务器
             NetClient netClient = vertx.createNetClient();//创建连接mysql客户端
-
-            VertxOptions options = new VertxOptions();
-            options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
-            vertx = Vertx.vertx(options);
 
             netServer.connectHandler(socket -> netClient.connect(port, mysqlHost, result -> {
                 //响应来自客户端的连接请求，成功之后，在建立一个与目标mysql服务器的连接
