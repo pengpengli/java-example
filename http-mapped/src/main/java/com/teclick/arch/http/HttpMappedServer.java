@@ -31,38 +31,49 @@ public class HttpMappedServer {
 
     public static class HttpMappedServerVerticle extends AbstractVerticle {
 
-        private final int port = 80;
-        private final int targetPort = 8081;
+        private final int port = 8081;
+        private final int targetPort = 8080;
         private final String targetHost = "localhost";
 
         @Override
         public void start() {
-            HttpServerOptions serverOptions = new HttpServerOptions().setLogActivity(false);//.setIdleTimeout(1);
+            HttpServerOptions serverOptions = new HttpServerOptions()
+//                    .setLogActivity(true)
+                    .setIdleTimeout(60);
             HttpServer httpServer = vertx.createHttpServer(serverOptions);
             httpServer.exceptionHandler(throwable -> logger.error("Server met exception", throwable));
 
-            HttpClientOptions clientOptions = new HttpClientOptions().setLogActivity(false).setKeepAlive(false);
+            HttpClientOptions clientOptions = new HttpClientOptions()
+//                    .setLogActivity(true)
+                    .setDefaultHost(targetHost)
+                    .setDefaultPort(targetPort);
             HttpClient httpClient = vertx.createHttpClient(clientOptions);
 
             httpServer.requestHandler(request -> {
+                HttpClientRequest localRequest = httpClient.request(request.method(), request.uri(), response -> {
+                    HttpServerResponse serverResponse = request.response();
+                    serverResponse.setStatusCode(response.statusCode());
+                    serverResponse.setStatusMessage(response.statusMessage());
+                    serverResponse.headers().clear();
+                    for (Map.Entry<String, String> entry : response.headers()) {
+                        String key = entry.getKey();
+                        if ("Location".equalsIgnoreCase(key)) {
+                            String value = entry.getValue().replace(targetHost, request.headers().get("HOST"));
+                            serverResponse.putHeader(key, value);
+                        } else {
+                            serverResponse.putHeader(key, entry.getValue());
+                        }
+                    }
 
-                RequestOptions requestOptions = new RequestOptions();
-                requestOptions.setHost(targetHost);
-                requestOptions.setPort(targetPort);
-                requestOptions.setURI(request.uri());
+                    String chunked = response.getHeader("Transfer-Encoding");
+                    serverResponse.setChunked((chunked != null) && ("chunked".equalsIgnoreCase(chunked)));
 
-                HttpClientRequest localRequest = httpClient.request(request.method(), requestOptions, response -> {
-                    request.response().setStatusCode(response.statusCode());
-                    request.response().setStatusMessage(response.statusMessage());
-                    request.response().headers().clear().addAll(response.headers());
-                    request.response().setChunked(true);
-
-                    response.endHandler(handler -> request.response().end());
-                    response.handler(handler -> request.response().write(handler));
+                    response.handler(serverResponse::write);
+                    response.endHandler(handler -> serverResponse.end());
                 });
 
                 localRequest.headers().clear();
-                for (Map.Entry<String, String> entry: request.headers()) {
+                for (Map.Entry<String, String> entry : request.headers()) {
                     String key = entry.getKey();
                     if ("HOST".equalsIgnoreCase(key)) {
                         localRequest.headers().add(key, targetHost);
@@ -78,7 +89,7 @@ public class HttpMappedServer {
                     request.connection().close();
                 });
 
-                request.exceptionHandler(handler ->{
+                request.exceptionHandler(handler -> {
                     request.connection().close();
                     if (null != localRequest.connection()) {
                         localRequest.connection().close();
@@ -91,7 +102,7 @@ public class HttpMappedServer {
                     case GET: {
                         String path = request.path().toLowerCase();
                         if (path.endsWith(".zip") || path.endsWith(".war")) {
-                            // spec file can't download
+                            System.out.println("zip or war");
                         }
                     }
                     case HEAD:
@@ -99,7 +110,7 @@ public class HttpMappedServer {
                         break;
                     }
                     case PUT: {
-                        // Call verify service to check
+                        System.out.println("PUT");
                     }
                     case POST:
                     default: {
