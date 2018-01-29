@@ -31,12 +31,20 @@ public class HttpMappedServer {
 
     public static class HttpMappedServerVerticle extends AbstractVerticle {
 
-        private final int port = 8081;
-        private final int targetPort = 8080;
+        private final int port = 8080;
+        private final int targetPort = 8081;
         private final String targetHost = "localhost";
 
         @Override
         public void start() {
+            vertx.getOrCreateContext().exceptionHandler(handler -> {
+
+            });
+
+            vertx.exceptionHandler(handler -> {
+
+            });
+
             HttpServerOptions serverOptions = new HttpServerOptions()
 //                    .setLogActivity(true)
                     .setIdleTimeout(60);
@@ -83,18 +91,15 @@ public class HttpMappedServer {
                 }
 
                 localRequest.exceptionHandler(handler -> {
-                    if (null != localRequest.connection()) {
-                        localRequest.connection().close();
-                    }
+                    request.response().setStatusCode(500);
+                    request.response().setStatusMessage(handler.getMessage());
+                    request.response().end(handler.getMessage());
                     request.connection().close();
                 });
 
-                request.exceptionHandler(handler -> {
-                    request.connection().close();
-                    if (null != localRequest.connection()) {
-                        localRequest.connection().close();
-                    }
-                });
+                localRequest.setTimeout(300 * 1000);
+
+                request.exceptionHandler(handler -> request.connection().close());
 
                 request.endHandler(handler -> localRequest.end());
 
@@ -122,6 +127,7 @@ public class HttpMappedServer {
                 if (listenResult.succeeded()) {
                     logger.info("http mapped server start up.");
                 } else {
+                    vertx.close();
                     logger.error("http mapped exit. because: " + listenResult.cause().getMessage(), listenResult.cause());
                     System.exit(1);
                 }
