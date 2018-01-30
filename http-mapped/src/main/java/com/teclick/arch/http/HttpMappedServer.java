@@ -24,49 +24,45 @@ public class HttpMappedServer {
 
     public static void main(String[] args) {
         VertxOptions options = new VertxOptions();
-        options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
+        //options.setMaxEventLoopExecuteTime(Long.MAX_VALUE);
         options.setFileResolverCachingEnabled(false);
         Vertx.vertx(options).deployVerticle(new HttpMappedServerVerticle());
     }
 
     public static class HttpMappedServerVerticle extends AbstractVerticle {
 
-        private final int port = 8080;
-        private final int targetPort = 8081;
-        private final String targetHost = "localhost";
+        private static final int PORT = 8080;
+        private static final int TARGET_PORT = 8081;
+        private static final String TARGET_HOST = "localhost";
 
         @Override
         public void start() {
-            vertx.getOrCreateContext().exceptionHandler(handler -> {
+            vertx.getOrCreateContext().exceptionHandler(err -> logger.error("Vertx context exception", err));
 
-            });
-
-            vertx.exceptionHandler(handler -> {
-
-            });
+            vertx.exceptionHandler(err -> logger.error("Vertx exception", err));
 
             HttpServerOptions serverOptions = new HttpServerOptions()
 //                    .setLogActivity(true)
                     .setIdleTimeout(60);
             HttpServer httpServer = vertx.createHttpServer(serverOptions);
-            httpServer.exceptionHandler(throwable -> logger.error("Server met exception", throwable));
+            httpServer.exceptionHandler(err -> logger.error("Server met exception", err));
 
             HttpClientOptions clientOptions = new HttpClientOptions()
 //                    .setLogActivity(true)
-                    .setDefaultHost(targetHost)
-                    .setDefaultPort(targetPort);
+                    .setDefaultHost(TARGET_HOST)
+                    .setDefaultPort(TARGET_PORT);
             HttpClient httpClient = vertx.createHttpClient(clientOptions);
 
             httpServer.requestHandler(request -> {
+                HttpServerResponse serverResponse = request.response();
                 HttpClientRequest localRequest = httpClient.request(request.method(), request.uri(), response -> {
-                    HttpServerResponse serverResponse = request.response();
                     serverResponse.setStatusCode(response.statusCode());
                     serverResponse.setStatusMessage(response.statusMessage());
                     serverResponse.headers().clear();
                     for (Map.Entry<String, String> entry : response.headers()) {
                         String key = entry.getKey();
                         if ("Location".equalsIgnoreCase(key)) {
-                            String value = entry.getValue().replace(targetHost, request.headers().get("HOST"));
+                            String value = entry.getValue().replace(TARGET_HOST + ":" + TARGET_PORT, request.headers().get("HOST"));
                             serverResponse.putHeader(key, value);
                         } else {
                             serverResponse.putHeader(key, entry.getValue());
@@ -76,54 +72,23 @@ public class HttpMappedServer {
                     String chunked = response.getHeader("Transfer-Encoding");
                     serverResponse.setChunked((chunked != null) && ("chunked".equalsIgnoreCase(chunked)));
 
-                    response.handler(serverResponse::write);
                     response.endHandler(handler -> serverResponse.end());
-                });
+                    response.handler(serverResponse::write);
+                }).exceptionHandler(err -> {
+                    serverResponse.setStatusCode(500);
+                    serverResponse.setStatusMessage(err.getMessage());
+                    serverResponse.end(err.getMessage());
+                    serverResponse.close();
+                }).setTimeout(300 * 1000);
 
-                localRequest.headers().clear();
-                for (Map.Entry<String, String> entry : request.headers()) {
-                    String key = entry.getKey();
-                    if ("HOST".equalsIgnoreCase(key)) {
-                        localRequest.headers().add(key, targetHost);
-                    } else {
-                        localRequest.headers().add(key, entry.getValue());
-                    }
-                }
-
-                localRequest.exceptionHandler(handler -> {
-                    request.response().setStatusCode(500);
-                    request.response().setStatusMessage(handler.getMessage());
-                    request.response().end(handler.getMessage());
-                    request.connection().close();
-                });
-
-                localRequest.setTimeout(300 * 1000);
+                localRequest.headers().clear().addAll(request.headers());
 
                 request.exceptionHandler(handler -> request.connection().close());
 
                 request.endHandler(handler -> localRequest.end());
+                request.handler(localRequest::write);
 
-                switch (request.method()) {
-                    case GET: {
-                        String path = request.path().toLowerCase();
-                        if (path.endsWith(".zip") || path.endsWith(".war")) {
-                            System.out.println("zip or war");
-                        }
-                    }
-                    case HEAD:
-                    case DELETE: {
-                        break;
-                    }
-                    case PUT: {
-                        System.out.println("PUT");
-                    }
-                    case POST:
-                    default: {
-                        request.handler(localRequest::write);
-                    }
-                }
-
-            }).listen(port, listenResult -> {
+            }).exceptionHandler(err -> logger.error("Http Server", err)).listen(PORT, listenResult -> {
                 if (listenResult.succeeded()) {
                     logger.info("http mapped server start up.");
                 } else {
