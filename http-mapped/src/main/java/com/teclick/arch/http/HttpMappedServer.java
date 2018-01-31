@@ -1,14 +1,13 @@
 package com.teclick.arch.http;
 
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
-
-import java.util.Map;
 
 /**
  * Created by pengli on 2017-11-03.
@@ -58,8 +57,9 @@ public class HttpMappedServer {
                 HttpClientRequest localRequest = httpClient.request(request.method(), request.uri(), response -> {
                     serverResponse.setStatusCode(response.statusCode());
                     serverResponse.setStatusMessage(response.statusMessage());
+
                     serverResponse.headers().clear();
-                    for (Map.Entry<String, String> entry : response.headers()) {
+                    response.headers().forEach((entry) -> {
                         String key = entry.getKey();
                         if ("Location".equalsIgnoreCase(key)) {
                             String value = entry.getValue().replace(TARGET_HOST + ":" + TARGET_PORT, request.headers().get("HOST"));
@@ -67,19 +67,24 @@ public class HttpMappedServer {
                         } else {
                             serverResponse.putHeader(key, entry.getValue());
                         }
-                    }
+                    });
 
                     String chunked = response.getHeader("Transfer-Encoding");
                     serverResponse.setChunked((chunked != null) && ("chunked".equalsIgnoreCase(chunked)));
 
                     response.endHandler(handler -> serverResponse.end());
                     response.handler(serverResponse::write);
-                }).exceptionHandler(err -> {
+                }).exceptionHandler(error -> {
+                    //io.vertx.core.VertxException
+                    //io.netty.channel.AbstractChannel$AnnotatedConnectException
                     serverResponse.setStatusCode(500);
-                    serverResponse.setStatusMessage(err.getMessage());
-                    serverResponse.end(err.getMessage());
-                    serverResponse.close();
+                    serverResponse.end();
+                    logger.error("Local http request exception", error);
                 }).setTimeout(300 * 1000);
+
+                localRequest.connectionHandler(connection -> connection.exceptionHandler(error -> {
+                    logger.error("Local http client connection exception", error);
+                }));
 
                 localRequest.headers().clear().addAll(request.headers());
 
