@@ -95,7 +95,7 @@ public class HttpMappedServer {
                 request.endHandler(handler -> localRequest.end());
                 request.handler(localRequest::write);
 
-            }).exceptionHandler(err -> logger.error("Http Server", err)).listen(PORT, "local.sfbest.com", listenResult -> {
+            }).exceptionHandler(err -> logger.error("Http Server", err)).listen(PORT, listenResult -> {
                 if (listenResult.succeeded()) {
                     logger.info("http mapped server start up.");
                 } else {
