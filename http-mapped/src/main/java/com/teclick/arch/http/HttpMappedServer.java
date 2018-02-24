@@ -19,8 +19,8 @@ public class HttpMappedServer {
     static {
         SLF4JBridgeHandler.removeHandlersForRootLogger();
         SLF4JBridgeHandler.install();
-        System.setProperty(DISABLE_FILE_CACHING_PROP_NAME, "false");
-        System.setProperty(DISABLE_CP_RESOLVING_PROP_NAME, "false");
+        System.setProperty(DISABLE_FILE_CACHING_PROP_NAME, "true");
+        System.setProperty(DISABLE_CP_RESOLVING_PROP_NAME, "true");
     }
 
     private static final Logger logger = LoggerFactory.getLogger(HttpMappedServer.class);
@@ -33,7 +33,7 @@ public class HttpMappedServer {
 
     public static class HttpMappedServerVerticle extends AbstractVerticle {
 
-        private static final int PORT = 8081;
+        private static final int PORT = 8080;
         private static final int TARGET_PORT = 8081;
         private static final String TARGET_HOST = "localhost";
 
